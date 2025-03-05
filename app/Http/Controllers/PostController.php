@@ -26,7 +26,7 @@ class PostController extends Controller
 
         $post = new Post();
         $post->alertType = trim($request->input('alertType'));
-        $post->content = trim($request->input('content'));
+        $post->content = "Incoming Emergency Alert";
         $post->status = $request->input('status', 0);
         $post->longitude = $request->input('longitude');
         $post->latitude = $request->input('latitude');
@@ -34,7 +34,7 @@ class PostController extends Controller
         $post->save();
 
         return response()->json([
-            'message' => 'Post created successfully',
+            'message' => 'Alert created successfully',
             'post' => $post,
             'status' => 200,
         ], 200);

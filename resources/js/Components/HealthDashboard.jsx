@@ -5,6 +5,7 @@ import axios from "axios";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
 import Loader from "./Loader";
+import Navbar from "./Navbar";
 
 // Card Component
 function Card({ children }) {
@@ -53,7 +54,7 @@ export default function HealthDashboard() {
             const res = await axios.get("/api/all");
             if (res.status === 200) {
                 const healthAlerts = res.data.alerts.filter(
-                    (alert) => alert.alertType.toLowerCase() === "health"
+                    (alert) => alert.alertType.toLowerCase() === "medical"
                 );
                 setAlerts(healthAlerts);
                 setUsers(res.data.user);
@@ -138,7 +139,7 @@ export default function HealthDashboard() {
 
                 if (response.data && response.data.status === 200 && Array.isArray(response.data.alerts)) {
                     const healthAlerts = response.data.alerts.filter(
-                        (alert) => alert.alertType.toLowerCase() === "health"
+                        (alert) => alert.alertType.toLowerCase() === "medical"
                     );
 
                     setSearchResults(healthAlerts);
@@ -164,26 +165,9 @@ export default function HealthDashboard() {
 
     return (
         <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-            {/* Navbar */}
-            <nav className="bg-gray-800 p-4 rounded-md mb-6">
-                <ul className="flex justify-center space-x-8">
-                    <li>
-                        <Link to="/" className="text-white hover:text-gray-300">Fire</Link>
-                    </li>
-                    <li>
-                        <Link to="/health" className="text-white hover:text-gray-300">Health</Link>
-                    </li>
-                    <li>
-                        <Link to="/security" className="text-white hover:text-gray-300">Security</Link>
-                    </li>
-                    <li>
-                        <Link to="/general" className="text-white hover:text-gray-300">General</Link>
-                    </li>
-                </ul>
-            </nav>
-
+            <Navbar/>
             <h1 className="text-black text-3xl md:text-4xl font-bold text-center mb-6">
-                Health Dashboard 🏥
+                Emergency Response Medical Dashboard 🏥
             </h1>
 
             {/* Summary Section */}

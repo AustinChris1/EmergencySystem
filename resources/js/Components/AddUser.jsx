@@ -11,8 +11,6 @@ const AddUser = () => {
         email: "",
         date_of_birth: "",
         device_uid: "",
-        longitude: "",
-        latitude: "",
         current_location: "",
         status: false,
         image: null,
@@ -79,8 +77,6 @@ const AddUser = () => {
                 email: "",
                 date_of_birth: "",
                 device_uid: "",
-                longitude: "",
-                latitude: "",
                 current_location: "",
                 status: false,
                 image: null,
@@ -139,19 +135,7 @@ const AddUser = () => {
                 </div>
 
                 <div className="mb-4">
-                    <label htmlFor="longitude" className="block text-sm font-medium text-gray-700">Longitude</label>
-                    <input type="number" name="longitude" value={formData.longitude} onChange={handleChange} className={`mt-1 p-2 w-full border rounded-md ${errors.longitude ? 'border-red-500' : ''}`} />
-                    {errors.longitude && <p className="text-red-500 text-xs mt-1">{errors.longitude[0]}</p>}
-                </div>
-
-                <div className="mb-4">
-                    <label htmlFor="latitude" className="block text-sm font-medium text-gray-700">Latitude</label>
-                    <input type="number" name="latitude" value={formData.latitude} onChange={handleChange} className={`mt-1 p-2 w-full border rounded-md ${errors.latitude ? 'border-red-500' : ''}`} />
-                    {errors.latitude && <p className="text-red-500 text-xs mt-1">{errors.latitude[0]}</p>}
-                </div>
-
-                <div className="mb-4">
-                    <label htmlFor="current_location" className="block text-sm font-medium text-gray-700">Current Location</label>
+                    <label htmlFor="current_location" className="block text-sm font-medium text-gray-700">Residential Address</label>
                     <input type="text" name="current_location" value={formData.current_location} onChange={handleChange} className="mt-1 p-2 w-full border rounded-md" />
                 </div>
 

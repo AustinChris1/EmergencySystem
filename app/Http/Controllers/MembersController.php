@@ -18,8 +18,6 @@ class MembersController extends Controller
             'email' => 'required|email|unique:members,email',
             'date_of_birth' => 'required|date',
             'device_uid' => 'required|string|max:255|unique:members,device_uid',
-            'longitude' => 'required|numeric',
-            'latitude' => 'required|numeric',
             'current_location' => 'nullable|string|max:255',
             'status' => 'nullable|in:0,1',
             'image' => 'nullable|image|mimes:jpg,jpeg,png|max:2048', // Validate image
@@ -40,8 +38,6 @@ class MembersController extends Controller
             'email' => $request->input('email'),
             'date_of_birth' => $request->input('date_of_birth'),
             'device_uid' => $request->input('device_uid'),
-            'longitude' => $request->input('longitude'),
-            'latitude' => $request->input('latitude'),
             'current_location' => trim($request->input('current_location')),
             'status' => $request->input('status', 0),
         ]);
@@ -59,7 +55,7 @@ class MembersController extends Controller
         }
 
         return response()->json([
-            'message' => 'Member added successfully',
+            'message' => 'User added successfully',
             'member' => $member,
             'status' => 200,
         ], 200);
