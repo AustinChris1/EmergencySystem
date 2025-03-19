@@ -24,7 +24,7 @@ axios.interceptors.request.use(function (config) {
 function App() {
 
   return (
-    <>
+    <div className="App font-raleway">
       <Router>
         <Routes>
         <Route path='/' element={<FireDashboard />}></Route>
@@ -45,7 +45,7 @@ function App() {
         pauseOnHover
       />
 
-    </>
+    </div>
   )
 }
 

@@ -1,24 +1,41 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, Check, Search } from "lucide-react";
+import { AlertTriangle, Check, Search, MapPin, Calendar, Users, Flame, Thermometer, Droplets, Sun, Moon } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { Link } from "react-router-dom";
 import Loader from "./Loader";
-import Navbar from "./Navbar";
+import Sidebar from "./Sidebar";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 // Card Component
 function Card({ children }) {
     return (
-        <div className="bg-white p-4 rounded-lg shadow-md transition-shadow hover:shadow-lg">
+        <div className="bg-white p-6 rounded-xl shadow-lg transition-shadow hover:shadow-2xl border border-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200">
             {children}
+        </div>
+    );
+}
+
+// Widget Component
+function Widget({ title, value, icon, color }) {
+    return (
+        <div className={`p-4 rounded-lg shadow-md flex items-center space-x-4 bg-<span class="math-inline">\{color\}\-50 dark\:bg\-</span>{color}-800 dark:text-gray-100`}>
+            <div className={`p-3 rounded-full bg-<span class="math-inline">\{color\}\-100 dark\:bg\-</span>{color}-700`}>
+                {icon}
+            </div>
+            <div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{title}</p>
+                <p className="text-2xl font-semibold">{value}</p>
+            </div>
         </div>
     );
 }
 
 // Card Content Component
 function CardContent({ children }) {
-    return <div className="p-4">{children}</div>;
+    return <div className="p-4 dark:text-gray-200">{children}</div>;
 }
 
 function ToggleButton({ status, onToggle }) {
@@ -27,12 +44,12 @@ function ToggleButton({ status, onToggle }) {
             {status === "0" ? (
                 <button
                     onClick={onToggle}
-                    className="px-4 py-2 rounded-md text-white font-semibold bg-red-500"
+                    className="px-4 py-2 rounded-md text-white font-semibold bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
                 >
                     Mark as Resolved
                 </button>
             ) : (
-                <p className="text-green-500">Resolved</p>
+                <p className="text-green-600 font-semibold dark:text-green-400">Resolved</p>
             )}
         </>
     );
@@ -48,16 +65,35 @@ export default function HealthDashboard() {
     const [searchTerm, setSearchTerm] = useState("");
     const [searchResults, setSearchResults] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [chartData, setChartData] = useState([]);
+    const [startDateFilter, setStartDateFilter] = useState(null);
+    const [endDateFilter, setEndDateFilter] = useState(null);
+    const [filteredAlerts, setFilteredAlerts] = useState([]);
+    const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+    const [darkMode, setDarkMode] = useState(false);
+
+    useEffect(() => {
+        if (darkMode) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [darkMode]);
+
+    const toggleDarkMode = () => {
+        setDarkMode(!darkMode);
+    };
 
     const fetchAlerts = async () => {
         try {
             const res = await axios.get("/api/all");
             if (res.status === 200) {
-                const healthAlerts = res.data.alerts.filter(
+                const HealthAlerts = res.data.alerts.filter(
                     (alert) => alert.alertType.toLowerCase() === "medical"
                 );
-                setAlerts(healthAlerts);
+                setAlerts(HealthAlerts);
                 setUsers(res.data.user);
+                prepareChartData(HealthAlerts);
             } else {
                 console.error(res.data.message);
             }
@@ -66,6 +102,21 @@ export default function HealthDashboard() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const prepareChartData = (alerts) => {
+        const dailyCounts = {};
+        alerts.forEach(alert => {
+            const date = new Date(alert.created_at).toISOString().split('T')[0];
+            dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+        });
+
+        const sortedDates = Object.keys(dailyCounts).sort();
+        const data = sortedDates.map(date => ({
+            date: date,
+            cases: dailyCounts[date]
+        }));
+        setChartData(data);
     };
 
     useEffect(() => {
@@ -90,7 +141,7 @@ export default function HealthDashboard() {
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    // Filter health cases by date
+    // Filter Health cases by date
     const dailyCases = alerts.filter(
         (alert) => parseDate(alert.created_at) >= startOfToday
     );
@@ -102,7 +153,20 @@ export default function HealthDashboard() {
     );
 
     const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleString();
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+        const year = date.getFullYear();
+
+        let hours = date.getHours();
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12; // the hour '0' should be '12'
+        hours = String(hours).padStart(2, '0');
+
+        return `${day}/${month}/${year} ${hours}:${minutes}:${seconds} ${ampm}`;
     };
 
     const getUserDetails = (deviceId) => {
@@ -138,11 +202,11 @@ export default function HealthDashboard() {
                 });
 
                 if (response.data && response.data.status === 200 && Array.isArray(response.data.alerts)) {
-                    const healthAlerts = response.data.alerts.filter(
+                    const HealthAlerts = response.data.alerts.filter(
                         (alert) => alert.alertType.toLowerCase() === "medical"
                     );
 
-                    setSearchResults(healthAlerts);
+                    setSearchResults(HealthAlerts);
                 } else {
                     setSearchResults([]); // Ensure empty array if no valid response
                 }
@@ -160,197 +224,254 @@ export default function HealthDashboard() {
     // Pagination
     const indexOfLastAlert = currentPage * alertsPerPage;
     const indexOfFirstAlert = indexOfLastAlert - alertsPerPage;
-    const currentAlerts = alerts.slice(indexOfFirstAlert, indexOfLastAlert);
-    const totalPages = Math.ceil(alerts.length / alertsPerPage);
+    const currentAlerts = (filteredAlerts.length > 0 ? filteredAlerts : alerts).slice(indexOfFirstAlert, indexOfLastAlert);
+    const totalPages = Math.ceil((filteredAlerts.length > 0 ? filteredAlerts : alerts).length / alertsPerPage);
+
+    useEffect(() => {
+        let filtered = alerts;
+        if (startDateFilter && endDateFilter) {
+            filtered = alerts.filter(alert => {
+                const alertDate = parseDate(alert.created_at);
+                return alertDate >= startDateFilter && alertDate <= endDateFilter;
+            });
+        }
+        setFilteredAlerts(filtered);
+    }, [startDateFilter, endDateFilter, alerts]);
 
     return (
-        <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-            <Navbar/>
-            <h1 className="text-black text-3xl md:text-4xl font-bold text-center mb-6">
-                Emergency Response Medical Dashboard 🏥
-            </h1>
+        <div className={`flex h-full w-full bg-gray-100 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-300`}>
+            {/* Sidebar */}
+            <Sidebar isExpanded={isSidebarExpanded} setIsExpanded={setIsSidebarExpanded} darkMode={darkMode} setDarkMode={setDarkMode} />
 
-            {/* Summary Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardContent>
-                        <p className="text-2xl font-semibold">{dailyCases.length}</p>
-                        <p className="text-gray-600">Cases Today</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent>
-                        <p className="text-2xl font-semibold">{weeklyCases.length}</p>
-                        <p className="text-gray-600">Cases This Week</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent>
-                        <p className="text-2xl font-semibold">{monthlyCases.length}</p>
-                        <p className="text-gray-600">Cases This Month</p>
-                    </CardContent>
-                </Card>
-            </div>
-            {/* Search Bar */}
-            <div className="mb-4 flex items-center">
-                <input
-                    type="text"
-                    placeholder="Search alerts..."
-                    value={searchTerm}
-                    onChange={handleSearch}
-                    className="border rounded-md p-2 w-full"
-                />
-                <Search className="ml-2" />
-            </div>
-            {/* Incoming Cases */}
-            <Card>
-                <CardContent>
-                    <h2 className="text-xl md:text-2xl font-semibold mb-4">
-                        Incoming Cases
-                    </h2>
-                    {loading ? (
-                        <Loader />
-                    ) : searchResults.length > 0 ? (
-                        // Show search results if available
-                        <div className="space-y-2">
-                            {searchResults.map((alert) => {
-                                const color = alert.status === "0" ? "red" : "green";
+            {/* Main Content */}
+            <div className={`flex-1 pr-4 space-y-8 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-300 ${isSidebarExpanded ? 'ml-48' : 'ml-16'}`}>
+                <div className="flex justify-between items-center">
+                    <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                        Emergency Response Medical Dashboard 🏥
+                    </h1>
+                </div>
 
-                                return (
-                                    <motion.div
-                                        key={alert.id}
-                                        onClick={() => setSelectedCase(alert)}
-                                        className={`cursor-pointer p-3 border rounded flex justify-between items-center bg-${color}-50 hover:bg-${color}-100 transition-colors`}
-                                        {...(alert.status === "0"
-                                            ? { animate: { opacity: [0.5, 1, 0.5] }, transition: { repeat: Infinity, duration: 1 } }
-                                            : {})}
-                                    >
-                                        <span className={`text-${color}-700 font-semibold text-sm md:text-base`}>
-                                            {alert.content} - {formatDate(alert.created_at)}
-                                        </span>
-                                        {alert.status === "1" ? (
-                                            <Check className="text-green-700" size={20} />
-                                        ) : (
-                                            <AlertTriangle className="text-red-700" size={20} />
-                                        )}
-                                    </motion.div>
-                                );
-                            })}
+                {/* Widgets Section */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Widget title="Cases Today" value={dailyCases.length} icon={<Calendar size={24} />} color="blue" />
+                    <Widget title="Cases This Week" value={weeklyCases.length} icon={<Calendar size={24} />} color="green" />
+                    <Widget title="Cases This Month" value={monthlyCases.length} icon={<Calendar size={24} />} color="purple" />
+                    <Widget title="Total Users" value={users.length} icon={<Users size={24} />} color="indigo" />
+                </div>
+
+                {/* Chart Section */}
+                <Card>
+                    <CardContent>
+                        <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Medical Alerts Over Time</h2>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-600" />
+                                <XAxis dataKey="date" className="dark:text-gray-300" />
+                                <YAxis className="dark:text-gray-300" />
+                                <Tooltip contentStyle={{ backgroundColor: darkMode ? '#374151' : '#fff', color: darkMode ? '#fff' : '#000' }} />
+                                <Legend className="dark:text-gray-300" />
+                                <Line type="monotone" dataKey="cases" stroke="#8884d8" activeDot={{ r: 8 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+
+                <div className="space-y-6 md:space-y-8">
+                    {/* Date Filter */}
+                    <div className="flex flex-col sm:flex-row items-center justify-start space-y-3 sm:space-y-0 sm:space-x-4">
+                        <div className="flex-1">
+                            <DatePicker
+                                selected={startDateFilter}
+                                onChange={setStartDateFilter}
+                                selectsStart
+                                startDate={startDateFilter}
+                                endDate={endDateFilter}
+                                placeholderText="Start Date"
+                                className="w-full border rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                            />
                         </div>
-                    ) : alerts.length === 0 ? (
-                        <p>No active health alerts.</p>
-                    ) : (
-                        <>
-                            <div className="space-y-2">
-                                {currentAlerts.map((alert) => {
-                                    const color = alert.status === "0" ? "red" : "green";
+                        <div className="flex-1">
+                            <DatePicker
+                                selected={endDateFilter}
+                                onChange={setEndDateFilter}
+                                selectsEnd
+                                startDate={startDateFilter}
+                                endDate={endDateFilter}
+                                minDate={startDateFilter}
+                                placeholderText="End Date"
+                                className="w-full border rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                            />
+                        </div>
+                        <button
+                            onClick={() => {
+                                setStartDateFilter(null);
+                                setEndDateFilter(null);
+                            }}
+                            className="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors duration-200"
+                        >
+                            Clear Filters
+                        </button>
+                    </div>
 
+                    {/* Search Section */}
+                    <div className="rounded-md shadow-sm">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search alerts..."
+                                value={searchTerm}
+                                onChange={handleSearch}
+                                className="w-full border rounded-md py-3 px-4 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                            />
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Search className="text-gray-500 dark:text-gray-400" size={18} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {/* Search and Incoming Cases Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                        {/* Incoming Cases */}
+                        <Card>
+                            <CardContent>
+                                <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Incoming Cases</h2>
+                                {loading ? (<Loader />
+                                ) : searchResults.length > 0 ? (
+                                    // Show search results if available
+                                    <div className="space-y-3">
+                                        {searchResults.map(alert => (
+                                            <motion.div
+                                                key={alert.id}
+                                                onClick={() => setSelectedCase(alert)}
+                                                className={`cursor-pointer p-4 border rounded-xl flex justify-between items-center bg-opacity-50 hover:bg-opacity-75 transition-colors dark:bg-opacity-80 dark:hover:bg-opacity-70 ${alert.status === "0" ? "bg-red-200 dark:bg-red-800" : "bg-green-200 dark:bg-green-800"}`}
+                                                animate={{ opacity: [0.5, 1, 0.5] }}
+                                                transition={{ repeat: Infinity, duration: 1 }}
+                                            >
+                                                <span className="font-semibold text-base">
+                                                    {alert.content} - {formatDate(alert.created_at)}
+                                                </span>
+                                                {alert.status === "1" ? <Check className="text-green-700 dark:text-green-400" size={20} /> : <AlertTriangle className="text-red-700 dark:text-red-400" size={20} />}
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                ) : filteredAlerts.length === 0 && alerts.length === 0 ? (
+                                    <p className="text-gray-600 dark:text-gray-300">No active Health alerts.</p>
+                                ) : (
+                                    <>
+                                        <div className="space-y-3">
+                                            {currentAlerts.map((alert) => {
+                                                const alertColor = alert.status === "0" ? "red" : "green";
+
+                                                return (
+                                                    <motion.div
+                                                        key={alert.id}
+                                                        onClick={() => setSelectedCase(alert)}
+                                                        className={`cursor-pointer p-4 border rounded-xl flex justify-between items-center bg-${alertColor}-50 hover:bg-${alertColor}-100 transition-colors dark:bg-${alertColor}-800 dark:border-${alertColor}-700 ${selectedCase && selectedCase.id === alert.id ? `border-2 border-${alertColor}-500` : ''}`}                                                    {...(alert.status === "0"
+                                                            ? { animate: { opacity: [0.5, 1, 0.5] }, transition: { repeat: Infinity, duration: 1 } }
+                                                            : {})}
+                                                    >
+                                                        <span className={`text-${alertColor}-700 font-semibold text-base dark:text-${alertColor}-400`}>
+                                                            {alert.content} - {formatDate(alert.created_at)}
+                                                        </span>
+                                                        {alert.status === "1" ? (
+                                                            <Check className="text-green-700 dark:text-green-400" size={20} />
+                                                        ) : (
+                                                            <AlertTriangle className="text-red-700 dark:text-red-400" size={20} />
+                                                        )}
+                                                    </motion.div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/*Pagination Controls */}
+                                        <div className="flex justify-center mt-4">
+                                            <button
+                                                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                                                disabled={currentPage === 1}
+                                                className="px-4 py-2 mx-1 border rounded-md disabled:opacity-50 dark:border-gray-600 dark:text-gray-200"
+                                            >
+                                                Previous
+                                            </button>
+                                            <span className="mx-2 text-gray-700 dark:text-gray-300">{`Page ${currentPage} of ${totalPages}`}</span>
+                                            <button
+                                                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                                                disabled={currentPage === totalPages}
+                                                className="px-4 py-2 mx-1 border rounded-md disabled:opacity-50 dark:border-gray-600 dark:text-gray-200"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Case Details & Map */}
+                    {selectedCase && (
+                        <Card>
+                            <CardContent>
+                                <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Case Details</h2>
+                                {(() => {
+                                    const user = getUserDetails(selectedCase.UID);
                                     return (
-                                        <motion.div
-                                            key={alert.id}
-                                            onClick={() => setSelectedCase(alert)}
-                                            className={`cursor-pointer p-3 border rounded flex justify-between items-center bg-${color}-50 hover:bg-${color}-100 transition-colors`}
-                                            animate={{ opacity: [0.5, 1, 0.5] }}
-                                            transition={{ repeat: Infinity, duration: 1 }}
-                                        >
-                                            <span className={`text-${color}-700 font-semibold text-sm md:text-base`}>
-                                                {alert.content} - {formatDate(alert.created_at)}
-                                            </span>
-                                            {alert.status === "1" ? (
-                                                <Check className="text-green-700" size={20} />
-                                            ) : (
-                                                <AlertTriangle className="text-red-700" size={20} />
-                                            )}
-                                        </motion.div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Pagination Controls */}
-                            <div className="flex justify-center mt-4">
-                                <button
-                                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1 mx-1 border rounded disabled:opacity-50"
-                                >
-                                    Previous
-                                </button>
-                                <span>{`Page ${currentPage} of ${totalPages}`}</span>
-                                <button
-                                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1 mx-1 border rounded disabled:opacity-50"
-                                >
-                                    Next
-                                </button>
-                            </div>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-            {/* Case Details & Map */}
-            {selectedCase && (
-                <Card>
-                    <CardContent>
-                        <h2 className="text-xl md:text-2xl font-semibold">Case Details</h2>
-                        {/* Display correct user information */}
-                        {(() => {
-                            const user = getUserDetails(selectedCase.UID);
-                            return (
-                                <>
-                                    <div className="flex items-center space-x-4 mb-2">
-                                        <div className="flex-shrink-0">
-                                            {user.image && (
-                                                <img
-                                                    src={user.image}
-                                                    alt={user.first_name}
-                                                    className="w-12 h-12 rounded-full object-cover"
-                                                />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <p className="text-gray-700 font-semibold">
-                                                Reporter: {user.first_name} {user.last_name}
+                                        <>
+                                            <div className="flex items-center space-x-4 mb-3">
+                                                <div className="flex-shrink-0">
+                                                    {user.image && (
+                                                        <img
+                                                            src={user.image}
+                                                            alt={user.first_name}
+                                                            className="w-14 h-14 rounded-full object-cover"
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className="text-gray-700 font-semibold dark:text-gray-300">
+                                                        Reporter: {user.first_name} {user.last_name}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <p className="text-gray-700 mb-2 dark:text-gray-300">
+                                                <strong>Device ID:</strong> {selectedCase.UID}
                                             </p>
-                                        </div>
-                                    </div>
-                                    <p className="text-gray-700">
-                                        <strong>Device ID:</strong> {selectedCase.UID}
-                                    </p>
-                                    <p className="text-gray-700">
-                                        <strong>Location:</strong> {selectedCase.latitude}, {selectedCase.longitude}
-                                    </p>
-                                    <p className="text-gray-700">
-                                        <strong>Reported:</strong> {formatDate(selectedCase.created_at)}
-                                    </p>
-                                    <p className="text-gray-700">
-                                        <strong>Status:</strong>{" "}
-                                        {selectedCase.status === "0" ? "Unresolved" : "Resolved"}
-                                    </p>
-                                    <div className="mb-4">
-                                        <ToggleButton
-                                            status={selectedCase.status}
-                                            onToggle={() => changeStatus(selectedCase.id)}
-                                        />
-                                    </div>
-                                    <div className="mt-4 w-full h-64 rounded-lg overflow-hidden">
-                                        <iframe
-                                            width="100%"
-                                            height="100%"
-                                            frameBorder="0"
-                                            scrolling="no"
-                                            marginHeight="0"
-                                            marginWidth="0"
-                                            title="Google Maps Embed"
-                                            src={`https://maps.google.com/maps?q=$${selectedCase.latitude},${selectedCase.longitude}&z=15&output=embed`}
-                                        ></iframe>
-                                    </div>
-                                </>
-                            );
-                        })()}
-                    </CardContent>
-                </Card>
-            )}
+                                            <p className="text-gray-700 mb-2 dark:text-gray-300">
+                                                <strong>Location:</strong> {selectedCase.latitude}, {selectedCase.longitude}
+                                            </p>
+                                            <p className="text-gray-700 mb-2 dark:text-gray-300">
+                                                <strong>Reported:</strong> {formatDate(selectedCase.created_at)}
+                                            </p>
+                                            <p className="text-gray-700 mb-3 dark:text-gray-300">
+                                                <strong>Status:</strong>{" "}
+                                                {selectedCase.status === "0" ? "Unresolved" : "Resolved"}
+                                            </p>
+                                            <div className="mb-4">
+                                                <ToggleButton
+                                                    status={selectedCase.status}
+                                                    onToggle={() => changeStatus(selectedCase.id)}
+                                                />
+                                            </div>
+                                            <div className="mt-4 w-full h-72 rounded-xl overflow-hidden">
+                                                <iframe
+                                                    width="100%"
+                                                    height="100%"
+                                                    frameBorder="0"
+                                                    scrolling="no"
+                                                    marginHeight="0"
+                                                    marginWidth="0"
+                                                    title="Google Maps Embed"
+                                                    src={`https://maps.google.com/maps?q=${selectedCase.latitude},${selectedCase.longitude}&z=15&output=embed`}
+                                                ></iframe>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
