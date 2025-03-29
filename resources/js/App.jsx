@@ -8,6 +8,7 @@ import HealthDashboard from './Components/HealthDashboard';
 import SecurityDashboard from './Components/SecurityDashboard';
 import GeneralDashboard from './Components/GeneralDashboard';
 import AddUser from './Components/AddUser';
+import DarkMode from './Components/DarkMode';
 
 axios.defaults.withCredentials = true;
 axios.defaults.withXSRFToken = true;
@@ -32,7 +33,9 @@ function App() {
         <Route path='/security' element={<SecurityDashboard />}></Route>
         <Route path='/general' element={<GeneralDashboard />}></Route>
         <Route path='/add' element={<AddUser/>}></Route>
-        </Routes> </Router>
+        </Routes> 
+        <DarkMode/>
+        </Router>
 
       {/* ToastContainer for global notifications */}
       <ToastContainer

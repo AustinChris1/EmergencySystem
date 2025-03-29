@@ -1,38 +1,136 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, Check, Search, MapPin, Calendar, Users, Flame, Thermometer, Droplets, Sun, Moon } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
 import Loader from "./Loader";
 import Sidebar from "./Sidebar";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import ReactApexChart from 'react-apexcharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
+import {
+    ComposableMap,
+    Geographies,
+    Geography,
+    Marker,
+    Annotation,
+    ZoomableGroup
+} from "react-simple-maps";
+import { geoEqualEarth } from "d3-geo";
+import { feature } from "topojson-client";
+import world from "./world-topo.json";
 
 // Card Component
 function Card({ children }) {
     return (
-        <div className="bg-white p-6 rounded-xl shadow-lg transition-shadow hover:shadow-2xl border border-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-lg">
             {children}
         </div>
     );
 }
 
 // Widget Component
-function Widget({ title, value, icon, color }) {
+
+const generateRandomGraphData = (count = 7) => {
+    const data = [];
+    let lastValue = Math.floor(Math.random() * 100);
+    for (let i = 0; i < count; i++) {
+        const change = Math.floor(Math.random() * 20) - 10; // Random change between -10 and 9
+        lastValue = Math.max(0, lastValue + change); // Ensure value doesn't go below 0
+        data.push({ name: `Day ${i + 1}`, value: lastValue });
+    }
+    return data;
+};
+
+// Helper function to calculate percentage change
+const calculatePercentageChange = (current, previous) => {
+    if (previous === 0) {
+        return current > 0 ? '∞%' : '0%';
+    }
+    const change = current - previous;
+    const percentage = (change / previous) * 100;
+    return `${percentage > 0 ? '+' : ''}${percentage.toFixed(1)}%`;
+};
+
+// Widget Component
+function Widget({ title, value, icon, color, previousValue }) {
+    const [graphData, setGraphData] = useState([]);
+    const [percentageChange, setPercentageChange] = useState('');
+    const [graphStrokeColor, setGraphStrokeColor] = useState('');
+    const [iconColor, setIconColor] = useState('');
+
+    useEffect(() => {
+        setGraphData(generateRandomGraphData()); // Set random data on mount and update
+        const graphColor = getColorForGraph(title);
+        setGraphStrokeColor(graphColor);
+        setIconColor(getIconColorForGraph(title));
+
+        if (previousValue !== undefined) {
+            setPercentageChange(calculatePercentageChange(value, previousValue));
+        }
+    }, [title, value, previousValue]);
+
+    const getColorForGraph = (widgetTitle) => {
+        switch (widgetTitle) {
+            case "Cases Today":
+                return "#6366F1"; // Indigo
+            case "Cases This Week":
+                return "#3B82F6"; // Blue
+            case "Cases This Month":
+                return "#EF4444"; // Red
+            case "Total Users":
+                return "#FACC15"; // Yellow
+            default:
+                return "#9CA3AF"; // Gray as a fallback
+        }
+    };
+
+    const getIconColorForGraph = (widgetTitle) => {
+        switch (widgetTitle) {
+            case "Cases Today":
+                return "#4F46E5"; // Darker Indigo
+            case "Cases This Week":
+                return "#2563EB"; // Darker Blue
+            case "Cases This Month":
+                return "#B91C1C"; // Darker Red
+            case "Total Users":
+                return "#D97706"; // Darker Yellow
+            default:
+                return "#6B7280"; // Darker Gray as a fallback
+        }
+    };
+
     return (
-        <div className={`p-4 rounded-lg shadow-md flex items-center space-x-4 bg-<span class="math-inline">\{color\}\-50 dark\:bg\-</span>{color}-800 dark:text-gray-100`}>
-            <div className={`p-3 rounded-full bg-<span class="math-inline">\{color\}\-100 dark\:bg\-</span>{color}-700`}>
-                {icon}
+        <div className={`p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 transition-all duration-300 hover:shadow-lg flex flex-col`}>
+            <div className="flex items-center space-x-4 mb-3">
+                <div
+                    className={`p-2 rounded-full dark-gray-800 flex text-gray-100 items-center justify-center`}
+                    style={{ backgroundColor: getIconColorForGraph(title) }}
+                >
+                    {React.cloneElement(icon, { className: `text-${iconColor}` })}
+                </div>                 <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{title}</p>
+                    <p className="text-xl font-semibold text-gray-900 dark:text-gray-100">{value}</p>
+                </div>
+                {percentageChange && (
+                    <p className="text-base text-gray-500 dark:text-gray-400">
+                        <span className={percentageChange.startsWith('+') ? 'text-green-500' : 'text-red-500'}>{percentageChange}</span>
+                    </p>
+                )}
             </div>
-            <div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">{title}</p>
-                <p className="text-2xl font-semibold">{value}</p>
+            <div className="mt-2 h-20 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={graphData}>
+                        <Line type="monotone" dataKey="value" stroke={graphStrokeColor} strokeWidth={2} dot={false} />
+                        <XAxis dataKey="name" hide />
+                        <YAxis hide domain={['auto', 'auto']} />
+                    </LineChart>
+                </ResponsiveContainer>
             </div>
         </div>
     );
 }
-
 // Card Content Component
 function CardContent({ children }) {
     return <div className="p-4 dark:text-gray-200">{children}</div>;
@@ -54,7 +152,6 @@ function ToggleButton({ status, onToggle }) {
         </>
     );
 }
-
 export default function FireDashboard() {
     const [alerts, setAlerts] = useState([]);
     const [selectedCase, setSelectedCase] = useState(null);
@@ -71,18 +168,10 @@ export default function FireDashboard() {
     const [filteredAlerts, setFilteredAlerts] = useState([]);
     const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
     const [darkMode, setDarkMode] = useState(false);
+    const [mostAffectedAreas, setMostAffectedAreas] = useState([]);
+    const [pastUsers, setPastUsers] = useState(0);
 
-    useEffect(() => {
-        if (darkMode) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-    }, [darkMode]);
 
-    const toggleDarkMode = () => {
-        setDarkMode(!darkMode);
-    };
 
     const fetchAlerts = async () => {
         try {
@@ -94,6 +183,9 @@ export default function FireDashboard() {
                 setAlerts(fireAlerts);
                 setUsers(res.data.user);
                 prepareChartData(fireAlerts);
+                prepareAffectedAreas(fireAlerts); // Prepare data for the map
+                setPastUsers(Math.max(0, users.length - Math.floor(Math.random() * 20)));
+
             } else {
                 console.error(res.data.message);
             }
@@ -102,6 +194,33 @@ export default function FireDashboard() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const prepareAffectedAreas = (alerts) => {
+        const areas = {};
+        alerts.forEach(alert => {
+            const latitude = parseFloat(alert.latitude);
+            const longitude = parseFloat(alert.longitude);
+            if (!isNaN(latitude) && !isNaN(longitude)) {
+                const key = `${latitude}-${longitude}`;
+                areas[key] = (areas[key] || 0) + 1;
+            } else {
+                console.warn("Skipping alert with invalid latitude or longitude:", alert);
+            }
+        });
+
+
+        const sortedAreas = Object.entries(areas)
+            .sort(([, countA], [, countB]) => countB - countA)
+            .slice(0, 5)
+            .map(([coords, count]) => {
+                const [latitudeStr, longitudeStr] = coords.split('-');
+                const latitude = parseFloat(latitudeStr);
+                const longitude = parseFloat(longitudeStr);
+                return { latitude, longitude, count };
+            });
+
+        setMostAffectedAreas(sortedAreas);
     };
 
     const prepareChartData = (alerts) => {
@@ -123,8 +242,11 @@ export default function FireDashboard() {
         fetchAlerts(); // Initial Fetch
 
         const interval = setInterval(fetchAlerts, 5000);
-        return () => clearInterval(interval); // Cleanup on unmount
+        return () => clearInterval(interval);
     }, []);
+
+    ///FOR WIDGETS
+
 
     // Helper function to parse date
     const parseDate = (dateString) => new Date(dateString);
@@ -141,6 +263,16 @@ export default function FireDashboard() {
 
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
+    // Calculate the start of the previous day, week, and month
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfToday.getDate() - 1);
+
+    const startOfLastWeek = new Date(startOfWeek);
+    startOfLastWeek.setDate(startOfWeek.getDate() - 7);
+
+    const startOfLastMonth = new Date(startOfMonth);
+    startOfLastMonth.setMonth(startOfMonth.getMonth() - 1);
+
     // Filter fire cases by date
     const dailyCases = alerts.filter(
         (alert) => parseDate(alert.created_at) >= startOfToday
@@ -151,6 +283,24 @@ export default function FireDashboard() {
     const monthlyCases = alerts.filter(
         (alert) => parseDate(alert.created_at) >= startOfMonth
     );
+
+    // Filter fire cases for the previous day, week, and month for comparison
+    const pastDailyCases = alerts.filter(
+        (alert) =>
+            parseDate(alert.created_at) >= startOfYesterday &&
+            parseDate(alert.created_at) < startOfToday
+    );
+    const pastWeeklyCases = alerts.filter(
+        (alert) =>
+            parseDate(alert.created_at) >= startOfLastWeek &&
+            parseDate(alert.created_at) < startOfWeek
+    );
+    const pastMonthlyCases = alerts.filter(
+        (alert) =>
+            parseDate(alert.created_at) >= startOfLastMonth &&
+            parseDate(alert.created_at) < startOfMonth
+    );
+
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
@@ -171,6 +321,7 @@ export default function FireDashboard() {
     const getUserDetails = (deviceId) => {
         const user = users.find((user) => user.device_uid === deviceId);
         return user || { first_name: "Unknown", last_name: "Unknown" };
+
     };
 
     const changeStatus = async (id) => {
@@ -237,47 +388,353 @@ export default function FireDashboard() {
         setFilteredAlerts(filtered);
     }, [startDateFilter, endDateFilter, alerts]);
 
+    const prepareChartDataForApex = (data) => {
+        const colors = ['#33b2df', '#546E7A', '#d4526e', '#13d8aa', '#A5978B', '#2b908f', '#f9a3a4', '#90ee7e', '#fa1a1a', '#f291e5']; // A palette of colors
+
+        return {
+            series: [{
+                name: 'Fire Cases',
+                data: data.map(item => {
+                    const date = new Date(item.date);
+                    return [date.getTime(), item.cases];
+                }),
+            }],
+            options: {
+                chart: {
+                    type: 'area',
+                    stacked: false,
+                    zoom: {
+                        enabled: true
+                    },
+                    toolbar: { // Add a toolbar for interactions (optional)
+                        show: true,
+                        export: {
+                            csv: {
+                                filename: 'fire_alerts_data',
+                                columnDelimiter: ',',
+                                headerCategory: 'Date',
+                                headerValue: 'Cases',
+                                dateFormatter(timestamp) {
+                                    return new Date(timestamp).toLocaleDateString();
+                                }
+                            },
+                            svg: {
+                                filename: 'fire_alerts_chart',
+                            },
+                            png: {
+                                filename: 'fire_alerts_chart',
+                            }
+                        }
+                    },
+                    animations: { // Add some subtle animation
+                        enabled: true,
+                        easing: 'easeinout',
+                        speed: 800,
+                        animateGradually: {
+                            enabled: true,
+                            delay: 150
+                        },
+                        dynamicAnimation: {
+                            enabled: true,
+                            speed: 350
+                        }
+                    }
+                },
+                dataLabels: {
+                    enabled: false
+                },
+                markers: {
+                    size: 6,
+                    colors: [colors[0]], // Use the primary color for markers
+                    strokeColors: '#fff',
+                    strokeWidth: 2,
+                    hover: {
+                        size: 8
+                    }
+                },
+                fill: { // Add a gradient fill for visual appeal
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.7,
+                        opacityTo: 0.9,
+                        stops: [0, 100]
+                    }
+                },
+                colors: [colors[0]], // Set the primary color for the area
+                title: {
+                    text: 'Fire Alerts Over Time',
+                    align: 'left',
+                    style: {
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: darkMode ? '#fff' : '#333'
+                    }
+                },
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        format: 'MMM dd, yyyy', // More informative date format
+                        style: {
+                            colors: darkMode ? '#ccc' : '#666'
+                        }
+                    },
+                    axisBorder: {
+                        show: false
+                    },
+                    axisTicks: {
+                        show: false
+                    }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Number of Cases',
+                        style: {
+                            color: darkMode ? '#ccc' : '#666'
+                        }
+                    },
+                    min: 0,
+                    labels: {
+                        style: {
+                            colors: darkMode ? '#ccc' : '#666'
+                        }
+                    },
+                    grid: {
+                        borderColor: darkMode ? '#444' : '#eee',
+                        strokeDashArray: 5
+                    }
+                },
+                grid: {
+                    borderColor: darkMode ? '#444' : '#eee',
+                    row: {
+                        colors: darkMode ? ['#222', 'transparent'] : ['#f3f3f3', 'transparent'],
+                    },
+                },
+                tooltip: {
+                    shared: true,
+                    style: {
+                        backgroundColor: darkMode ? '#333' : '#fff',
+                        color: darkMode ? '#fff' : '#333'
+                    },
+                    x: {
+                        format: 'MMM dd, yyyy hh:mm:ss'
+                    },
+                    y: [{
+                        title: 'Cases: ',
+                        formatter: (val) => val
+                    }]
+                },
+                legend: {
+                    show: false // You can enable this if you have multiple series
+                }
+            },
+        };
+    };
+
+    const [position, setPosition] = useState({ coordinates: [3, 6.5], zoom: 1 });
+    const [clickedCoordinates, setClickedCoordinates] = useState(null);
+    const [clickedLocationInfo, setClickedLocationInfo] = useState('');
+
+    const handleZoomIn = useCallback(() => {
+        setPosition(prev => ({
+            ...prev,
+            zoom: Math.min(prev.zoom * 1.2, 10), // Prevent excessive zooming
+        }));
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+        setPosition(prev => ({
+            ...prev,
+            zoom: Math.max(prev.zoom / 1.2, 1), // Prevent zooming out too far
+        }));
+    }, []);
+
+    const handleMoveEnd = (newPosition) => {
+        setPosition(newPosition); // Ensure state updates when user drags map
+    };
     return (
-        <div className={`flex h-full w-full bg-gray-100 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-300`}>
+        <div className={`flex h-full w-full bg-gray-300 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-300`}>
             {/* Sidebar */}
-            <Sidebar isExpanded={isSidebarExpanded} setIsExpanded={setIsSidebarExpanded} darkMode={darkMode} setDarkMode={setDarkMode} />
+            {/* <Sidebar isExpanded={isSidebarExpanded} setIsExpanded={setIsSidebarExpanded} /> */}
 
             {/* Main Content */}
-            <div className={`flex-1 pr-4 space-y-8 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-300 ${isSidebarExpanded ? 'ml-48' : 'ml-16'}`}>
+            <div className={`flex-1 p-6 space-y-8 dark:bg-gray-900 dark:text-gray-200 transition-colors duration-300`}>
                 <div className="flex justify-between items-center">
-                    <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+                    <h1 className="text-3xl font-extrabold text-blue-900 dark:text-gray-100">
                         Emergency Response Fire Service 🔥
                     </h1>
                 </div>
 
-                {/* Widgets Section */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <Widget title="Cases Today" value={dailyCases.length} icon={<Calendar size={24} />} color="blue" />
-                    <Widget title="Cases This Week" value={weeklyCases.length} icon={<Calendar size={24} />} color="green" />
-                    <Widget title="Cases This Month" value={monthlyCases.length} icon={<Calendar size={24} />} color="purple" />
-                    <Widget title="Total Users" value={users.length} icon={<Users size={24} />} color="indigo" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    <Widget
+                        title="Cases Today"
+                        value={dailyCases.length}
+                        icon={<Calendar size={20} />}
+                        color="blue"
+                        previousValue={pastDailyCases?.length}
+                    />
+                    <Widget
+                        title="Cases This Week"
+                        value={weeklyCases.length}
+                        icon={<Calendar size={20} />}
+                        color="green"
+                        previousValue={pastWeeklyCases?.length}
+                    />
+                    <Widget
+                        title="Cases This Month"
+                        value={monthlyCases.length}
+                        icon={<Calendar size={20} />}
+                        color="purple"
+                        previousValue={pastMonthlyCases?.length}
+                    />
+                    <Widget
+                        title="Total Users"
+                        value={users.length}
+                        icon={<Users size={20} />}
+                        color="indigo"
+                    />
                 </div>
+                {/* Chart and Map Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Chart Section (using Nivo) */}
+                    <Card>
+                        <CardContent>
+                            <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Fire Alerts Over Time</h2>
+                            {chartData.length > 0 ? (
+                                <ReactApexChart
+                                    options={prepareChartDataForApex(chartData).options}
+                                    series={prepareChartDataForApex(chartData).series}
+                                    type="area"
+                                    height={350}
+                                />
+                            ) : (
+                                <p className="text-gray-600 dark:text-gray-300">No chart data available.</p>
+                            )}
+                        </CardContent>
+                    </Card>
 
-                {/* Chart Section */}
-                <Card>
-                    <CardContent>
-                        <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Fire Alerts Over Time</h2>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-600" />
-                                <XAxis dataKey="date" className="dark:text-gray-300" />
-                                <YAxis className="dark:text-gray-300" />
-                                <Tooltip contentStyle={{ backgroundColor: darkMode ? '#374151' : '#fff', color: darkMode ? '#fff' : '#000' }} />
-                                <Legend className="dark:text-gray-300" />
-                                <Line type="monotone" dataKey="cases" stroke="#8884d8" activeDot={{ r: 8 }} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-                <div className="space-y-6 md:space-y-8">
+                    <Card>
+                        <CardContent>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Most Affected Areas</h2>
+                                <div className="space-x-2">
+                                    <button onClick={handleZoomIn} className="...">+</button>
+                                    <button onClick={handleZoomOut} className="...">-</button>
+                                </div>
+                            </div>
+                            <div className="w-full h-auto rounded-xl overflow-hidden relative flex"> {/* Added flex */}
+                                <div className="h-96 w-3/4 relative overflow-hidden"> {/* Map container with fixed height and width */}
+                                    {mostAffectedAreas.length > 0 && mostAffectedAreas.some(area => !isNaN(area.latitude) && !isNaN(area.longitude)) ? (
+                                        <ComposableMap
+                                            projection={geoEqualEarth()}
+                                            projectionConfig={{
+                                                scale: 250, // Initial scale - zoom will multiply this
+                                                center: position.coordinates,
+                                            }}
+                                            style={{ width: "100%", height: "100%", cursor: "grab" }} // Changed cursor for better UX
+                                            onClick={(event) => {
+                                                const [longitude, latitude] = [event.clientX, event.clientY];
+                                                const projection = geoEqualEarth().scale(250 * position.zoom).center(position.coordinates);
+                                                const [lon, lat] = projection.invert([longitude - event.target.getBoundingClientRect().left, latitude - event.target.getBoundingClientRect().top]);
+
+                                                if (lon && lat) {
+                                                    setClickedCoordinates({ latitude: lat, longitude: lon });
+                                                    fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=f1f1160966274625af8d902ea3921b6b`)
+                                                        .then(response => response.json())
+                                                        .then(data => {
+                                                            if (data.results && data.results.length > 0) {
+                                                                setClickedLocationInfo(data.results[0].formatted);
+                                                            } else {
+                                                                setClickedLocationInfo(`No location found at Lat: ${lat.toFixed(2)}, Lon: ${lon.toFixed(2)}`);
+                                                            }
+                                                        })
+                                                        .catch(error => {
+                                                            console.error('Error fetching location:', error);
+                                                            setClickedLocationInfo('Error fetching location');
+                                                        });
+                                                } else {
+                                                    setClickedCoordinates(null);
+                                                    setClickedLocationInfo('');
+                                                }
+                                            }}
+                                        >
+                                            <ZoomableGroup
+                                                center={position.coordinates}
+                                                zoom={position.zoom}
+                                                onMoveEnd={handleMoveEnd}
+                                            >
+                                                <Geographies geography={world}>
+                                                    {({ geographies }) =>
+                                                        geographies.map((geo) => (
+                                                            <Geography
+                                                                key={geo.rsmKey}
+                                                                geography={geo}
+                                                                fill="#a6cee3"
+                                                                stroke="#1f78b4"
+                                                                strokeWidth={0.5}
+                                                                style={{ default: { outline: "none" }, hover: { outline: "none", fill: "#b2df8a" }, pressed: { outline: "none" } }}
+                                                            />))
+                                                    }
+                                                </Geographies>
+                                                {mostAffectedAreas.map((area, index) => (
+                                                    <Marker
+                                                        key={index}
+                                                        coordinates={[area.longitude, area.latitude]}
+                                                    >
+                                                        <circle
+                                                            r={area.count * 2 + 3}
+                                                            fill={`rgba(255, 0, 0, ${Math.min(area.count / 5, 1) * 0.7 + 0.3})`}
+                                                            stroke="#d62728"
+                                                            strokeWidth={1}
+                                                            style={{ opacity: 0.8, cursor: "pointer" }}
+                                                        >
+                                                            <title>{`Lat: ${area.latitude.toFixed(4)}, Lon: ${area.longitude.toFixed(4)} (${area.count} incidents)`}</title>
+                                                        </circle>
+                                                    </Marker>
+                                                ))}
+                                                {mostAffectedAreas.map((area, index) => (
+                                                    <Annotation
+                                                        key={`anno-${index}`}
+                                                        subject={[area.longitude, area.latitude]}
+                                                        dx={area.count > 2 ? -25 : 25}
+                                                        dy={-15}
+                                                        connectorProps={{ stroke: "#555", strokeWidth: 0.7, strokeDasharray: "3,3" }}
+                                                    >
+                                                        <text
+                                                            x={4}
+                                                            y={4}
+                                                            alignmentBaseline="middle"
+                                                            fontSize={11}
+                                                            fill="#333"
+                                                            fontWeight="bold"
+                                                            style={{ textShadow: "1px 1px white" }}
+                                                        >
+                                                            {`${area.latitude.toFixed(2)}, ${area.longitude.toFixed(2)}`}
+                                                        </text>
+                                                    </Annotation>
+                                                ))}
+                                                {clickedCoordinates && (
+                                                    <Marker coordinates={[clickedCoordinates.longitude, clickedCoordinates.latitude]}>
+                                                        <circle r={5} fill="blue" stroke="#fff" strokeWidth={2} />
+                                                    </Marker>
+                                                )}
+                                            </ZoomableGroup>
+                                        </ComposableMap>) : (
+                                        <p className="...">No significant affected areas to display.</p>
+                                    )}
+                                </div>
+                                <div className="w-1/4 p-4 flex items-center"> {/* Text display area */}
+                                    {clickedLocationInfo && <p className="text-sm text-gray-700 dark:text-gray-300">{clickedLocationInfo}</p>}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                </div>
+                <div className="space-y-6 md:space-y-8 space-x-3 flex justify-center">
                     {/* Date Filter */}
                     <div className="flex flex-col sm:flex-row items-center justify-start space-y-3 sm:space-y-0 sm:space-x-4">
-                        <div className="flex-1">
+                        <div className="flex">
                             <DatePicker
                                 selected={startDateFilter}
                                 onChange={setStartDateFilter}
@@ -288,7 +745,7 @@ export default function FireDashboard() {
                                 className="w-full border rounded-md py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
                             />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex">
                             <DatePicker
                                 selected={endDateFilter}
                                 onChange={setEndDateFilter}
@@ -311,22 +768,22 @@ export default function FireDashboard() {
                         </button>
                     </div>
 
-                    {/* Search Section */}
-                    <div className="rounded-md shadow-sm">
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder="Search alerts..."
-                                value={searchTerm}
-                                onChange={handleSearch}
-                                className="w-full border rounded-md py-3 px-4 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
-                            />
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Search className="text-gray-500 dark:text-gray-400" size={18} />
-                            </div>
+                </div>
+                {/* Search Section */}
+                <div className="rounded-md shadow-sm">
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder="Search alerts..."
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            className="w-full border rounded-md py-3 px-4 pl-10 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200"
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Search className="text-gray-500 dark:text-gray-400" size={18} />
                         </div>
                     </div>
-                </div>                
+                </div>
                 {/* Search and Incoming Cases Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
