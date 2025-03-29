@@ -639,7 +639,7 @@ export default function FireDashboard() {
 
                                                 if (lon && lat) {
                                                     setClickedCoordinates({ latitude: lat, longitude: lon });
-                                                    fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=f1f1160966274625af8d902ea3921b6b`)
+                                                    fetch(`https://api.opencagedata.com/geocode/v1/json?q=${lat}+${lon}&key=your_api`)
                                                         .then(response => response.json())
                                                         .then(data => {
                                                             if (data.results && data.results.length > 0) {
